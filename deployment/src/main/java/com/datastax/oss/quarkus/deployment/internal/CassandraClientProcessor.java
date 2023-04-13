@@ -42,11 +42,11 @@ import io.quarkus.deployment.builditem.nativeimage.RuntimeInitializedClassBuildI
 import io.quarkus.deployment.metrics.MetricsCapabilityBuildItem;
 import io.quarkus.runtime.metrics.MetricsFactory;
 import io.quarkus.smallrye.health.deployment.spi.HealthBuildItem;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.jboss.jandex.DotName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,44 +64,23 @@ class CassandraClientProcessor {
 
   @BuildStep
   List<ReflectiveClassBuildItem> registerGraphForReflection() {
-    ReflectiveClassBuildItem.Builder builder =
-        ReflectiveClassBuildItem.builder(
-                "org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal")
-            .methods(true)
-            .fields(true);
-    return Arrays.asList(
-        // Required for the driver DependencyCheck mechanism
-        builder.build(),
-        // Should be initialized at build time:
-        builder
-            .className(
-                new String[] {
-                  "org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerIoRegistryV3d0"
-                })
-            .build(),
-        builder
-            .className(
-                new String[] {
-                  "org.apache.tinkerpop.shaded.jackson.databind.deser.std.StdDeserializer"
-                })
-            .build(),
-        // Required by Tinkerpop:
-        // TODO check if this is really all that is instantiated by reflection
-        builder.className(new String[] {"org.apache.tinkerpop.gremlin.structure.Graph"}).build(),
-        builder
-            .className(
-                new String[] {"org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph"})
-            .build(),
-        builder
-            .className(
-                new String[] {"org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph"})
-            .build(),
-        builder
-            .className(
-                new String[] {
-                  "org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource"
-                })
-            .build());
+
+    /* TODO: We're creating an RCBI instance per class here to match up with the pre-Quarkus3.0 usage.
+     * Check to see if we can just simplify this to something like RCBI.builder(names).foo().build() */
+    return Stream.of(
+            "org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal",
+            "org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerIoRegistryV3d0",
+            "org.apache.tinkerpop.shaded.jackson.databind.deser.std.StdDeserializer",
+            // Required by Tinkerpop:
+            // TODO check if this is really all that is instantiated by reflection
+            "org.apache.tinkerpop.gremlin.structure.Graph",
+            "org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerGraph",
+            "org.apache.tinkerpop.gremlin.structure.util.empty.EmptyGraph",
+            "org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversalSource")
+        .map(
+            (clzName) ->
+                ReflectiveClassBuildItem.builder(clzName).methods(true).fields(true).build())
+        .collect(Collectors.toList());
   }
 
   @BuildStep
@@ -113,11 +92,10 @@ class CassandraClientProcessor {
   @BuildStep
   List<ReflectiveClassBuildItem> registerJsonForReflection() {
     // Required for the driver DependencyCheck mechanism
-    ReflectiveClassBuildItem.Builder builder =
-        ReflectiveClassBuildItem.builder("com.fasterxml.jackson.core.JsonParser");
-    return Arrays.asList(
-        builder.build(),
-        builder.className(new String[] {"com.fasterxml.jackson.databind.ObjectMapper"}).build());
+    return Stream.of(
+            "com.fasterxml.jackson.core.JsonParser", "com.fasterxml.jackson.databind.ObjectMapper")
+        .map((clzName) -> ReflectiveClassBuildItem.builder(clzName).build())
+        .collect(Collectors.toList());
   }
 
   @BuildStep
@@ -131,25 +109,22 @@ class CassandraClientProcessor {
   List<ReflectiveClassBuildItem> registerLz4ForReflection(
       CassandraClientBuildTimeConfig buildTimeConfig) {
     if (buildTimeConfig.protocolCompression.equalsIgnoreCase("lz4")) {
-      ReflectiveClassBuildItem.Builder builder =
-          ReflectiveClassBuildItem.builder("net.jpountz.lz4.LZ4Compressor")
-              .constructors(true)
-              .fields(true);
-      return Arrays.asList(
-          builder.build(),
-          builder.className(new String[] {"net.jpountz.lz4.LZ4JavaSafeCompressor"}).build(),
-          builder.className(new String[] {"net.jpountz.lz4.LZ4HCJavaSafeCompressor"}).build(),
-          builder.className(new String[] {"net.jpountz.lz4.LZ4JavaSafeFastDecompressor"}).build(),
-          builder.className(new String[] {"net.jpountz.lz4.LZ4JavaSafeSafeDecompressor"}).build(),
-          builder.className(new String[] {"net.jpountz.lz4.LZ4JavaUnsafeCompressor"}).build(),
-          builder.className(new String[] {"net.jpountz.lz4.LZ4HCJavaUnsafeCompressor"}).build(),
-          builder.className(new String[] {"net.jpountz.lz4.LZ4JavaUnsafeFastDecompressor"}).build(),
-          builder
-              .className(new String[] {"net.jpountz.lz4.LZ4JavaUnsafeSafeDecompressor"})
-              .build());
-    } else {
-      return Collections.emptyList();
+      return Stream.of(
+              "net.jpountz.lz4.LZ4Compressor",
+              "net.jpountz.lz4.LZ4JavaSafeCompressor",
+              "net.jpountz.lz4.LZ4HCJavaSafeCompressor",
+              "net.jpountz.lz4.LZ4JavaSafeFastDecompressor",
+              "net.jpountz.lz4.LZ4JavaSafeSafeDecompressor",
+              "net.jpountz.lz4.LZ4JavaUnsafeCompressor",
+              "net.jpountz.lz4.LZ4HCJavaUnsafeCompressor",
+              "net.jpountz.lz4.LZ4JavaUnsafeFastDecompressor",
+              "net.jpountz.lz4.LZ4JavaUnsafeSafeDecompressor")
+          .map(
+              (clzName) ->
+                  ReflectiveClassBuildItem.builder(clzName).constructors(true).fields(true).build())
+          .collect(Collectors.toList());
     }
+    return Collections.emptyList();
   }
 
   @Record(STATIC_INIT)
@@ -223,29 +198,26 @@ class CassandraClientProcessor {
       CassandraClientBuildTimeConfig buildTimeConfig,
       Optional<MetricsCapabilityBuildItem> metricsCapability) {
 
-    ReflectiveClassBuildItem.Builder builder =
-        ReflectiveClassBuildItem.builder(TaggingMetricIdGenerator.class).methods(true).fields(true);
     if (buildTimeConfig.metricsEnabled && metricsCapability.isPresent()) {
+
+      Stream<String> clzStream = Stream.empty();
       MetricsCapabilityBuildItem metricsCapabilityItem = metricsCapability.get();
       if (metricsCapabilityItem.metricsSupported(MetricsFactory.MICROMETER)) {
-        return Arrays.asList(
-            builder.build(),
-            builder
-                .className(
-                    new String[] {
-                      "com.datastax.oss.driver.internal.metrics.micrometer.MicrometerMetricsFactory"
-                    })
-                .build());
+        clzStream =
+            Stream.of(
+                TaggingMetricIdGenerator.class.getName(),
+                "com.datastax.oss.driver.internal.metrics.micrometer.MicrometerMetricsFactory");
       } else if (metricsCapabilityItem.metricsSupported(MetricsFactory.MP_METRICS)) {
-        return Arrays.asList(
-            builder.build(),
-            builder
-                .className(
-                    new String[] {
-                      "com.datastax.oss.driver.internal.metrics.microprofile.MicroProfileMetricsFactory"
-                    })
-                .build());
+        clzStream =
+            Stream.of(
+                TaggingMetricIdGenerator.class.getName(),
+                "com.datastax.oss.driver.internal.metrics.microprofile.MicroProfileMetricsFactory");
       }
+      return clzStream
+          .map(
+              (clzName) ->
+                  ReflectiveClassBuildItem.builder(clzName).methods(true).fields(true).build())
+          .collect(Collectors.toList());
     }
     return Collections.singletonList(
         ReflectiveClassBuildItem.builder(DefaultMetricsFactory.class).build());
