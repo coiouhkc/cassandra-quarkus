@@ -67,7 +67,6 @@ class CassandraClientProcessor {
     ReflectiveClassBuildItem.Builder builder =
         ReflectiveClassBuildItem.builder(
                 "org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal")
-            .constructors(true)
             .methods(true)
             .fields(true);
     return Arrays.asList(
