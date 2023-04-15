@@ -214,6 +214,8 @@ class CassandraClientProcessor {
             Stream.of(
                 TaggingMetricIdGenerator.class.getName(),
                 "com.datastax.oss.driver.internal.metrics.microprofile.MicroProfileMetricsFactory");
+      } else {
+        LOG.warn("The cassandra-quarkus plugin only supports Micrometer or MicroProfile metrics");
       }
       return clzStream
           .map(
