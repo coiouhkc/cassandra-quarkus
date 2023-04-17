@@ -68,7 +68,9 @@ class CassandraClientProcessor {
     /* TODO: We're creating an RCBI instance per class here to match up with the pre-Quarkus3.0 usage.
      * Check to see if we can just simplify this to something like RCBI.builder(names).foo().build() */
     return Stream.of(
+            // Required for the driver DependencyCheck mechanism
             "org.apache.tinkerpop.gremlin.process.traversal.dsl.graph.GraphTraversal",
+            // Should be initialized at build time:
             "org.apache.tinkerpop.gremlin.tinkergraph.structure.TinkerIoRegistryV3d0",
             "org.apache.tinkerpop.shaded.jackson.databind.deser.std.StdDeserializer",
             // Required by Tinkerpop:
