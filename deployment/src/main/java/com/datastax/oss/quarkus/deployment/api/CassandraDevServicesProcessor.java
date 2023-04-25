@@ -39,6 +39,7 @@ import java.util.Optional;
 import java.util.function.Supplier;
 import org.eclipse.microprofile.config.Config;
 import org.eclipse.microprofile.config.ConfigProvider;
+import org.eclipse.microprofile.config.ConfigValue;
 import org.jboss.logging.Logger;
 import org.testcontainers.containers.CassandraContainer;
 import org.testcontainers.containers.Network;
@@ -168,7 +169,8 @@ public class CassandraDevServicesProcessor {
         new ConfiguredCassandraContainer(
             DockerImageName.parse(config.imageName).asCompatibleSubstituteFor("cassandra"),
             config.fixedExposedPort,
-            launchMode.getLaunchMode() == LaunchMode.DEVELOPMENT ? config.serviceName : null);
+            launchMode.getLaunchMode() == LaunchMode.DEVELOPMENT ? config.serviceName : null,
+            config.initScript);
 
     final Supplier<DevServicesResultBuildItem.RunningDevService> defaultCassandraSupplier =
         () -> {
@@ -199,19 +201,21 @@ public class CassandraDevServicesProcessor {
     Config config = ConfigProvider.getConfig();
     // TODO: support for named connections?
     // TODO: refactor validation of contact points
-    for (String name : config.getPropertyNames()) {
-      if (name.equals("quarkus.cassandra.contact-points")
-          && config.getValue(name, String.class).isBlank()) {
-        return true;
-      }
-    }
-    return false;
+    // for (String name : config.getPropertyNames()) {
+    //   if (name.equals("quarkus.cassandra.contact-points")
+    //       && config.getValue(name, String.class).isBlank()) {
+    //     return true;
+    //   }
+    // }
+    ConfigValue configValue = config.getConfigValue("quarkus.cassandra.contact-points");
+    return configValue.getValue() == null || configValue.getValue().isBlank();
   }
 
   private DevServicesResultBuildItem.RunningDevService getRunningDevService(
       String containerId, Closeable closeable, String host, int port) {
     Map<String, String> configMap = new HashMap<>();
     configMap.putIfAbsent("quarkus.cassandra.contact-points", String.format("%s:%d", host, port));
+    configMap.putIfAbsent("quarkus.cassandra.local-datacenter", "datacenter1");
     return new DevServicesResultBuildItem.RunningDevService(
         "CASSANDRA", containerId, closeable, configMap);
   }
@@ -229,12 +233,15 @@ public class CassandraDevServicesProcessor {
     private final boolean shared;
     private final String serviceName;
 
+    private final String initScript;
+
     public CassandraDevServiceCfg(CassandraDevServicesBuildTimeConfig devServicesConfig) {
       this.devServicesEnabled = devServicesConfig.enabled.orElse(true);
       this.imageName = devServicesConfig.imageName;
       this.fixedExposedPort = devServicesConfig.port.orElse(0);
       this.shared = devServicesConfig.shared;
       this.serviceName = devServicesConfig.serviceName;
+      this.initScript = devServicesConfig.initScript.orElse(null);
     }
 
     @Override
@@ -257,15 +264,22 @@ public class CassandraDevServicesProcessor {
     }
   }
 
-  private static final class ConfiguredCassandraContainer extends CassandraContainer {
+  private static final class ConfiguredCassandraContainer
+      extends CassandraContainer<ConfiguredCassandraContainer> {
 
     private final int port;
 
     private ConfiguredCassandraContainer(
-        DockerImageName dockerImageName, int fixedExposedPort, String serviceName) {
+        DockerImageName dockerImageName,
+        int fixedExposedPort,
+        String serviceName,
+        String initScript) {
       super(dockerImageName);
       this.port = fixedExposedPort;
       withExposedPorts(CASSANDRA_PORT);
+      if (initScript != null) {
+        withInitScript(initScript);
+      }
       withNetwork(Network.SHARED);
       if (serviceName != null) { // Only adds the label in dev mode.
         withLabel(DEV_SERVICE_LABEL, serviceName);

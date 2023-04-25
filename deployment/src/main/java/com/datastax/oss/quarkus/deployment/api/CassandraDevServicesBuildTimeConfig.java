@@ -70,4 +70,8 @@ public class CassandraDevServicesBuildTimeConfig {
    */
   @ConfigItem(defaultValue = "cassandra")
   public String serviceName;
+
+  /** Init script (starting with creation of keyspace(s)) for Cassandra */
+  @ConfigItem(name = "init-script")
+  public Optional<String> initScript;
 }

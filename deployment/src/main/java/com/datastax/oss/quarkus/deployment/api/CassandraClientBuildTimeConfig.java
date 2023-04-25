@@ -106,5 +106,6 @@ public class CassandraClientBuildTimeConfig {
    * Configuration for DevServices. DevServices allows Quarkus to automatically start a Cassandra in
    * dev and test mode.
    */
-  @ConfigItem public CassandraDevServicesBuildTimeConfig devservices;
+  @ConfigItem(name = "devservices")
+  public CassandraDevServicesBuildTimeConfig devservices;
 }
