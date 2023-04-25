@@ -21,6 +21,7 @@ import io.quarkus.deployment.IsNormal;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.annotations.BuildSteps;
 import io.quarkus.deployment.builditem.DevServicesResultBuildItem;
+import io.quarkus.deployment.builditem.DevServicesResultBuildItem.RunningDevService;
 import io.quarkus.deployment.builditem.DockerStatusBuildItem;
 import io.quarkus.deployment.builditem.LaunchModeBuildItem;
 import io.quarkus.deployment.console.ConsoleInstalledBuildItem;
@@ -53,7 +54,7 @@ public class CassandraDevServicesProcessor {
 
   private static final ContainerLocator cassandraContainerLocator =
       new ContainerLocator(DEV_SERVICE_LABEL, CASSANDRA_PORT);
-  static volatile DevServicesResultBuildItem.RunningDevService devService;
+  static volatile RunningDevService devService;
   static volatile CassandraDevServiceCfg cfg;
   static volatile boolean first = true;
 
@@ -69,11 +70,11 @@ public class CassandraDevServicesProcessor {
     CassandraDevServiceCfg configuration = getConfiguration(cassandraClientBuildTimeConfig);
 
     if (devService != null) {
-      boolean shouldShutdownTheBroker = !configuration.equals(cfg);
-      if (!shouldShutdownTheBroker) {
+      boolean shouldShutdownTheCassandra = !configuration.equals(cfg);
+      if (!shouldShutdownTheCassandra) {
         return devService.toBuildItem();
       }
-      shutdownBroker();
+      shutdownCassandra();
       cfg = null;
     }
 
@@ -114,7 +115,7 @@ public class CassandraDevServicesProcessor {
       Runnable closeTask =
           () -> {
             if (devService != null) {
-              shutdownBroker();
+              shutdownCassandra();
 
               log.info("Dev Services for Cassandra shut down.");
             }
@@ -129,7 +130,7 @@ public class CassandraDevServicesProcessor {
     return devService.toBuildItem();
   }
 
-  private void shutdownBroker() {
+  private void shutdownCassandra() {
     if (devService != null) {
       try {
         devService.close();
@@ -169,10 +170,10 @@ public class CassandraDevServicesProcessor {
             config.fixedExposedPort,
             launchMode.getLaunchMode() == LaunchMode.DEVELOPMENT ? config.serviceName : null);
 
-    final Supplier<DevServicesResultBuildItem.RunningDevService> defaultCassandraBrokerSupplier =
+    final Supplier<DevServicesResultBuildItem.RunningDevService> defaultCassandraSupplier =
         () -> {
 
-          // Starting the broker
+          // Starting cassandra
           timeout.ifPresent(container::withStartupTimeout);
           container.start();
           return getRunningDevService(
@@ -191,7 +192,7 @@ public class CassandraDevServicesProcessor {
                     null,
                     containerAddress.getHost(),
                     containerAddress.getPort()))
-        .orElseGet(defaultCassandraBrokerSupplier);
+        .orElseGet(defaultCassandraSupplier);
   }
 
   private boolean hasCassandraContactPointsWithoutHostAndPort() {
